@@ -225,6 +225,7 @@ def ans(prompt,style,store):
         print(i.tool)
     tool_component = ' , '.join(map(str, tool_component))
     authors_tone_description = re.sub(r'Tone:.+', '', authors_tone_description).strip()
+    authors_tone_description = re.sub(r'TONE:.+', '', authors_tone_description).strip()
     return [authors_tone_description,tool_component]
 
 # prompt = """
