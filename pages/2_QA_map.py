@@ -44,7 +44,6 @@ if st.button("Update style",key=3):
     edited_text = st.session_state.editable_text3
     write_to_file(edited_text,"style3")
 
-
 # question 4
 st.subheader("Question 4 style:")
 current_content4 = read_file_content("style4")
