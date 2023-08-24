@@ -32,6 +32,7 @@ from langchain.callbacks import tracing_enabled
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate
+from langchain.utilities import SerpAPIWrapper
 
 st.set_page_config(layout="wide")
 
@@ -43,9 +44,11 @@ with st.sidebar:
     with st.form('Cohere/OpenAI'):
         mod = st.radio('Choose OpenAI/Cohere', ('OpenAI', 'Cohere'))
         api_key = st.text_input('Enter API key', type="password")
+        serpAI_key = st.text_input('Enter SERPAIAPI key', type="password")
         model = st.radio('Choose Company', ('ArtisanAppetite foods', 'BMW','Titan Watches'))
         submitted = st.form_submit_button("Submit")
 
+st.markdown('<a href="/QA_map" target="_self">Go to Edit Style -></a>', unsafe_allow_html=True)
 
 # Check if API key is provided and set up the language model accordingly
 if api_key:
@@ -59,10 +62,12 @@ if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
         llm = OpenAI(temperature=0.1, verbose=True)
         embeddings = OpenAIEmbeddings()
+        os.environ["SERPAPI_API_KEY"] = serpAI_key
     if(mod=='Cohere'):
         os.environ["Cohere_API_KEY"] = api_key
         llm = Cohere(cohere_api_key=api_key)
         embeddings = CohereEmbeddings(cohere_api_key=api_key)
+        os.environ["SERPAPI_API_KEY"] = serpAI_key
 
 def ans(prompt,style,store):
     s=[]
@@ -76,7 +81,8 @@ def ans(prompt,style,store):
     # Instantiate the handlers
     handler1 = MyCustomHandlerOne()
 
-    search = DuckDuckGoSearchRun()
+    # search = DuckDuckGoSearchRun()
+    search = SerpAPIWrapper()
 
     qa = RetrievalQA.from_chain_type(
             llm=llm,
@@ -94,8 +100,13 @@ def ans(prompt,style,store):
                 'more information about the topic'
             )
         ),
+        # Tool(
+        #     name='DuckDuckGo Search',
+        #     func= search.run,
+        #     description="Useful for when you need to do a search on the internet to find information that another tool can't find. be specific with your input."
+        # )
         Tool(
-            name='DuckDuckGo Search',
+            name='SerpAPI Search',
             func= search.run,
             description="Useful for when you need to do a search on the internet to find information that another tool can't find. be specific with your input."
         )
@@ -139,110 +150,109 @@ def ans(prompt,style,store):
     15. Sensory details: The inclusion of sensory information (sight, sound, taste, touch, smell) to enhance the reader's experience.
     """
 
-    def get_authors_tone_description(how_to_describe_tone, users_tweets,text):
+    def get_authors_tone_description(how_to_describe_tone, users_tweets):
+        print(users_tweets)
         template = """
             You are an AI Bot that is very good at generating writing in a similar tone as examples.
             Be opinionated and have an active voice.
             Take a strong stance with your response.
-            Do not mention the tone in your output.
 
             % HOW TO DESCRIBE TONE
             {how_to_describe_tone}
 
             % START OF EXAMPLES
-            {tweet_examples}
+            {users_tweets}
             % END OF EXAMPLES
 
-            %TEXT
-            {text}
-
-            %YOUR TASK
-            Your goal is to write content with the tone that is described below and mimic the tone.
+            List out the tone qualities of the examples above.
             """
 
         prompt = PromptTemplate(
-            input_variables=["how_to_describe_tone", "tweet_examples","text"],
+            input_variables=["how_to_describe_tone", "users_tweets"],
             template=template,
         )
 
-        final_prompt = prompt.format(how_to_describe_tone=how_to_describe_tone, tweet_examples=users_tweets,text=text)
-        
-        # print(final_prompt)
+        final_prompt = prompt.format(how_to_describe_tone=how_to_describe_tone, users_tweets=users_tweets)
+
         authors_tone_description = llm.predict(final_prompt)
 
         return authors_tone_description
     
     
-    example = style
+    # example = style
 
-    authors_tone_description = get_authors_tone_description(how_to_describe_tone, example,res)
+    authors_tone_description = get_authors_tone_description(how_to_describe_tone, style)
+    print (authors_tone_description)
 
-    # template = """
-    # % INSTRUCTIONS
-    # - You are a finance data analyst AI Bot that is very good at mimicking an author writing style.
-    # - You have to answer the question in detail.
-    # - Your goal is to write content with the tone that is described below.
-    # - Do not go outside the tone instructions below
+    print(res)
+    def count_paragraphs(text):
+        paragraphs = text.split('\n\n')  # Splitting based on double line breaks
+        para = len(paragraphs)
+        cnt=0
+        for i in text:
+            if i != ' ':
+                cnt = cnt+1
+        word = text.split(' ')
+        word = len(word)
+        line = text.split('.')
+        line = len(line)
+        return para,cnt, line-1,word
     
+    para = count_paragraphs(style.strip())
 
-    # % Description of the authors tone:
-    # {authors_tone_description}
+    prm = f"""
+    Please rewrite the given text in number of paragraphs while maintaining a character count as mentioned in the format
 
-    # % Authors writing samples
-    # {example}
+    format:
+    {authors_tone_description}
 
-    # % YOUR TASK
-    # {question}
-    # """
+    number of Paragraphs = {para[0]}
+    number of Characters = {para[1]}
+    number of Lines = {para[2]}
+    number of words = {para[3]}
 
-    # prompt = PromptTemplate(
-    #     input_variables=["authors_tone_description", "example","question"],
-    #     template=template,
-    # )
+    text = {res}
 
-    # final_prompt = prompt.format(authors_tone_description=authors_tone_description, example=example,question=prompt)
+    Do not include lines like 'The tone of the examples above is confident, authoritative, and optimistic.' in your output strictly
 
-    # res = agent_chain.run(final_prompt, callbacks=[handler1])
+    Do not include ;Word Count:, Number of Lines:, Number of Paragraphs:' in your output strictly
+    """
+    print(prm)
+    out = llm(prm)
+    print(out)
+    cleaned_text = re.sub(r'(Word Count: \d+|Number of Lines: \d+|Number of Paragraphs: \d+)\n', '', out)
+    cleaned_text = re.sub(r'Paragraph \d+: ', '', cleaned_text)
+    print("before no of")
+    print(cleaned_text)
+    cleaned_text = re.sub(r'Number of Paragraphs: \d+\n', '', cleaned_text)
 
-
-    # prompt_style = f"""
-    # You are an editor.
-    # You have to convert the provided text into a style that is similar to the style mentioned.
-    # The style does not mention any instructions rather it is an example of how the answer is expected to be.
-    # You have to copy similar format exactly as the style is in.
-
-    # Do not copy the text in style strictly in any case.
-
-    # text = {res}
-    # style = {style}
-    # """
-
-    # response = llm(prompt_style)
-        # agent_action = s[0]
     tool_component = []
     for i in s:
         tool_component.append(i.tool)
         print(i.tool)
     tool_component = ' , '.join(map(str, tool_component))
-    authors_tone_description = re.sub(r'Tone:.+', '', authors_tone_description).strip()
-    authors_tone_description = re.sub(r'TONE:.+', '', authors_tone_description).strip()
-    return [authors_tone_description,tool_component]
+    cleaned_text = re.sub(r'Tone:.+', '', cleaned_text).strip()
+    def remove_specific_sentences(paragraph, phrases_to_remove):
+        sentences = paragraph.split('. ')
+        filtered_sentences = [sentence for sentence in sentences if all(phrase not in sentence for phrase in phrases_to_remove)]
+        modified_paragraph = '. '.join(filtered_sentences)
+        return modified_paragraph
 
-# prompt = """
-# what are some of the key risks and potential ways to mitigate in ArtisanAppetite foods?
-# """
+    phrases_to_remove = ["Word Count", "Number of Paragraphs"]
+    modified_paragraph = remove_specific_sentences(cleaned_text, phrases_to_remove)
+    return [modified_paragraph,tool_component]
 
-# style = """
-# To fulfill growing demand, X company must be able to depend on the quality and stability of suppliers who may face limited resources, regulation restraints, and capacity controls. Currently, X company pays its suppliers an average of 23% above market prices to procure the high-quality Arabica coffee its brand relies upon. Given the limited supply of beans that meet its standards as well as price volatility discussed in the commodity prices section below, the company faces potential shortages, and skyrocketing prices of its core product should its criteria not be met in a given harvest.
+def write_to_file(text,fil):
+    with open(f"{fil}.txt", "w") as f:
+        f.write(text)
 
-# Additionally, X company relationships with suppliers – especially those in the developing world – have long been a target issue for activists of human rights, environmental and labor issues. Activists began pressuring the company to offer fair trade coffee in 2000, and the company faced a major reputational blow in 2006 after campaigns by Oxfam against X company dealings with the Ethiopian government as well as the documentary Black Gold. In an industry with active competition on sustainability issues, the health of the X company brand is reliant on the company’s ability to source ethically traded inputs.
-# """
+def read_file_content(fil):
+    try:
+        with open(f"{fil}.txt", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "File not created yet."
 
-# prompt = st.text_input('Enter Question')
-# style = st.text_input('Enter style')
-
-
-# Create a single line layout
 col1, col2, col3 = st.columns([1, 2, 1])
 
 # Components in the first column
@@ -252,19 +262,6 @@ with col1:
     st.write(prompt)
     # prompt = prompt
 
-# Components in the second column
-with col2:
-    style = """It is an artificial intelligence research laboratory. 
-The company created the ChatGPT Generative AI program, 
-which operates on a large language model and takes in a text prompt to generate a human-like response. 
-OpenAI systems are powered by Microsoft's Azure-based supercomputing platform.
-    """
-    style = st.text_area("Enter style", value=style, key=1)
-    # st.write(style)
-
-    # style = st.text_area('Enter style', key=1)
-    # style = style
-
 # Components in the third column
 with col3:
     submitted = st.button("Submit", key=11)
@@ -273,8 +270,9 @@ if submitted:
     st.title('Answer:')
     # st.write("1 pressed")
     # st.write(template_string)
+    current_content1 = read_file_content("style1")
     store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-    ans = ans(prompt,style,store)
+    ans = ans(prompt,current_content1,store)
     # st.write(ans[0])
     # st.write(ans[2])
     ans1 = st.text_area("Answer in Style Mentioned:", value=ans[0])
@@ -288,25 +286,7 @@ with col1:
     # prompt2 = st.text_area('Enter Question', key=2)
     prompt2=f'Provide a summary of the {model} financial position.'
     st.write(prompt2)
-    # prompt = prompt2
 
-# Components in the second column
-with col2:
-    style2 = """Three sources briefed on OpenAI's recent pitch to investors said the organization 
-expects $200 million in revenue next year and $1 billion by 2024.
-
-The forecast, first reported by Reuters, represents how some in Silicon Valley 
-are betting the underlying technology will go far beyond splashy and sometimes flawed public demos.
-
-OpenAI was most recently valued at $20 billion in a secondary share sale, one of the sources said. 
-The startup has already inspired rivals and companies building applications atop its generative 
-AI software, which includes the image maker DALL-E 2. OpenAI charges developers licensing its technology 
-about a penny or a little more to generate 20,000 words of text, and about 2 cents to create an image 
-from a written prompt, according to its website.
-    """
-    style2 = st.text_area("Enter style", value=style2, key=2)
-    # style2 = st.text_area('Enter style', key=2)
-    # style = style2
 
 # Components in the third column
 with col3:
@@ -314,12 +294,9 @@ with col3:
 
 if submitted2:
     st.title('Answer:')
-    # st.write("1 pressed")
-    # st.write(template_string)
+    current_content2 = read_file_content("style2")
     store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-    ans = ans(prompt2,style2,store)
-    # st.write(ans[0])
-    # st.write(ans[2])
+    ans = ans(prompt2,current_content2,store)
     ans2 = st.text_area("Answer in Style Mentioned:", value=ans[0])
     st.write("Tool used:")
     st.write(ans[1])
@@ -330,17 +307,6 @@ with col1:
     # prompt3 = st.text_area('Enter Question', key=3)
     prompt3=f'what are some of the key risks and potential ways to mitigate in {model}?'
     st.write(prompt3)
-    # prompt = prompt3
-
-# Components in the second column
-with col2:
-    style3 = """They suggest several ways to mitigate these risks. 
-    It includes the need for an international authority that can inspect systems, require audits, 
-    test for compliance with safety standards, place restrictions on deployment degrees and security levels, etc.
-    """
-    style3 = st.text_area("Enter style", value=style3, key=3)
-    # style3 = st.text_area('Enter style', key=3)
-    # style = style3
 
 # Components in the third column
 with col3:
@@ -348,11 +314,9 @@ with col3:
 
 if submitted3:
     st.title('Answer:')
-    # st.write(template_string)
+    current_content3 = read_file_content("style3")
     store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-    ans = ans(prompt3,style3,store)
-    # st.write(ans[0])
-    # st.write(ans[2])
+    ans = ans(prompt3,current_content3,store)
     ans3 = st.text_area("Answer in Style Mentioned:", value=ans[0])
     st.write("Tool used:")
     st.write(ans[1])
@@ -363,17 +327,6 @@ with col1:
     # prompt4 = st.text_area('Enter Question', key=4)
     prompt4=f'provide an analysis of the the indutry and the competition of {model}?'
     st.write(prompt4)
-    # prompt = prompt4
-
-# Components in the second column
-with col2:
-    style4 = """OpenAI's top competitors include Anthropic, Cohere, and Aleph Alpha. 
-    Anthropic provides artificial intelligence (AI) 
-    safety and research services specializing in developing general AI systems and language models.
-    """
-    style4 = st.text_area("Enter style", value=style4, key=4)
-    # style4 = st.text_area('Enter style', key=4)
-    # style = style4
 
 # Components in the third column
 with col3:
@@ -382,41 +335,10 @@ with col3:
 
 if submitted4:
     st.title('Answer:')
-    # # st.write("4 pressed")
-    # template_string = f"""
-    # question = {prompt4}
-    # You are a finance data analyst. You have to answer the above question in detail.
-    # The answer should be in points explained properly.
-    # You have to strictly follow the style of answering the question as follows and generate similar answers:
-    # style = {style4}
-
-    # Do not copy the content of the style in your answer.
-    # Only study the style and follow the grammer accordingly
-    # """
-    # st.write(template_string)
+    current_content4 = read_file_content("style4")
     store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-    ans = ans(prompt4,style4,store)
-    # st.write(ans[0])
-    # st.write(ans[2])
+    ans = ans(prompt4,current_content4,store)
     ans4 = st.text_area("Answer in Style Mentioned:", value=ans[0])
+    # st.write(style4)
     st.write("Tool used:")
     st.write(ans[1])
-
-
-
-# uploaded_file = st.file_uploader(f"Upload image:", type=['pdf'])
-# if uploaded_file is not None: 
-#     loader = PyPDFLoader('ArtisanAppetite foods.pdf')
-#     # Split pages from pdf
-#     pages = loader.load_and_split()
-#     # Load documents into vector database aka ChromaDB
-#     store = Chroma.from_documents(pages, embeddings, collection_name='annualreport')
-
-
-# Display submitted text and styled text
-# if submitted:
-#     st.write("Submitted text:", prompt)
-# # if (st.button("Submit")):
-#     persist_directory = 'ArtisanAppetite'
-#     store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-#     st.write(ans(template_string,store))

@@ -1,0 +1,6 @@
+Over the years, many AI tools and platforms have emerged. Recently, OpenAI has become the most popular AI source due to its accuracy and precision. Looking at the popularity of OpenAI, and having completed our OpenAI PESTLE analysis already, we decided to conduct an OpenAI SWOT Analysis.
+
+
+However, before we proceed and conduct the SWOT analysis, let’s look at the history and current operations of OpenAI so that you all are well aware of what OpenAI is.
+
+OpenAI is an AI research laboratory consisting of the for-profit OpenAI LP and the non-profit OpenAI Inc. The organization was co-founded in 2015 by tech luminaries such as Elon Musk, Sam Altman, Greg Brockman, Ilya Sutskever, John Schulman, and Wojciech Zaremba.

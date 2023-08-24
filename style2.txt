@@ -1,0 +1,11 @@
+Three sources briefed on OpenAI's recent pitch to investors said the organization 
+expects $200 million in revenue next year and $1 billion by 2024.
+
+The forecast, first reported by Reuters, represents how some in Silicon Valley 
+are betting the underlying technology will go far beyond splashy and sometimes flawed public demos.
+
+OpenAI was most recently valued at $20 billion in a secondary share sale, one of the sources said. 
+The startup has already inspired rivals and companies building applications atop its generative 
+AI software, which includes the image maker DALL-E 2. OpenAI charges developers licensing its technology 
+about a penny or a little more to generate 20,000 words of text, and about 2 cents to create an image 
+from a written prompt, according to its website.

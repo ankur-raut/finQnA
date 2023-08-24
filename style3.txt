@@ -1,0 +1,3 @@
+They suggest several ways to mitigate these risks. 
+It includes the need for an international authority that can inspect systems, require audits, 
+test for compliance with safety standards, place restrictions on deployment degrees and security levels, etc.
